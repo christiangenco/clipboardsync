@@ -3,7 +3,10 @@ require 'shellwords'
 require 'uri'
 
 class ClipboardSync
+  REMOTE_HOST = "archy.local"
   TEMP_IMAGE_PATH = "/tmp/clipboard_sync_image.png"
+  # dynamic wayland display detection
+  WAYLAND_ENV_SETUP = "export XDG_RUNTIME_DIR=/run/user/$(id -u); export WAYLAND_DISPLAY=$(cd $XDG_RUNTIME_DIR && ls wayland-[0-9]* 2>/dev/null | head -n 1);"
   
   def initialize
     @last_hash = nil
@@ -109,14 +112,18 @@ class ClipboardSync
       puts "   (Syncing file content + registering path on Linux clipboard)"
       
       # 1. scp the file
-      scp_cmd = "scp #{path.shellescape} linux_box:#{remote_dir}"
+      scp_cmd = "scp #{path.shellescape} #{REMOTE_HOST}:#{remote_dir}"
       
       # 2. ssh to register it with wl-copy
       # We use readlink -f to ensure absolute path, required for file:// URIs
       remote_file_ref = "#{remote_dir}#{filename.shellescape}"
-      register_cmd = "ssh linux_box 'echo file://$(readlink -f #{remote_file_ref}) | wl-copy -t text/uri-list'"
+      register_cmd = "ssh #{REMOTE_HOST} '#{WAYLAND_ENV_SETUP} echo file://$(readlink -f #{remote_file_ref}) | wl-copy -t text/uri-list'"
       
-      puts "   [Sync Plan]: #{scp_cmd} && #{register_cmd}"
+      puts "   [Syncing]: #{scp_cmd} && #{register_cmd}"
+      Thread.new do
+        system(scp_cmd)
+        system(register_cmd)
+      end
       return true
     else
       return false
@@ -140,9 +147,13 @@ class ClipboardSync
     if !content.empty?
       puts "🌈 RICH TEXT (#{type.upcase}) DETECTED"
       if type == "html"
-        puts "   [Sync Plan]: echo #{content.shellescape} | ssh linux_box 'wl-copy --type text/html'"
+        cmd = "echo #{content.shellescape} | ssh #{REMOTE_HOST} '#{WAYLAND_ENV_SETUP} wl-copy --type text/html'"
+        puts "   [Syncing]: #{cmd}"
+        Thread.new { system(cmd) }
       else
-        puts "   [Sync Plan]: (RTF Sync) echo #{content.shellescape} | ssh linux_box 'wl-copy --type text/rtf'"
+        cmd = "echo #{content.shellescape} | ssh #{REMOTE_HOST} '#{WAYLAND_ENV_SETUP} wl-copy --type text/rtf'"
+        puts "   [Syncing]: (RTF Sync) #{cmd}"
+        Thread.new { system(cmd) }
       end
       return true
     else
@@ -179,7 +190,9 @@ class ClipboardSync
       size = File.size(TEMP_IMAGE_PATH)
       puts "🖼️  IMAGE DETECTED: #{size} bytes"
       puts "   [Local Cache]: #{TEMP_IMAGE_PATH}"
-      puts "   [Sync Plan]: scp #{TEMP_IMAGE_PATH} linux_box:/tmp/clip.png && ssh linux_box 'wl-copy --type image/png < /tmp/clip.png'"
+      cmd = "scp #{TEMP_IMAGE_PATH} #{REMOTE_HOST}:/tmp/clip.png && ssh #{REMOTE_HOST} '#{WAYLAND_ENV_SETUP} wl-copy --type image/png < /tmp/clip.png'"
+      puts "   [Syncing]: #{cmd}"
+      Thread.new { system(cmd) }
     else
       puts "❌ Image detected but failed to save."
     end
@@ -195,7 +208,9 @@ class ClipboardSync
     preview = content.length > 60 ? content[0..60].gsub(/\n/, ' ') + "..." : content.gsub(/\n/, ' ')
     puts "📝 TEXT DETECTED: \"#{preview}\""
     # For syncing text, we might pipe it over ssh
-    puts "   [Sync Plan]: echo #{content.shellescape} | ssh linux_box 'wl-copy'"
+    cmd = "echo #{content.shellescape} | ssh #{REMOTE_HOST} '#{WAYLAND_ENV_SETUP} wl-copy'"
+    puts "   [Syncing]: #{cmd}"
+    Thread.new { system(cmd) }
   end
 end
 
