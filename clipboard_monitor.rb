@@ -28,7 +28,7 @@ class ClipboardSync
   def check_clipboard
     # Get raw clipboard info string for change detection
     # format is roughly: "«class furl», 123, «class utf8», 456..."
-    info_str = `osascript -e 'try' -e 'return (clipboard info) as string' -e 'end try' 2>/dev/null`.strip
+    info_str = `osascript -e 'try' -e 'return (clipboard info) as string' -e 'end try' 2>/dev/null`.force_encoding('UTF-8').strip
     
     current_hash = info_str.hash
 

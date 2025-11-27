@@ -38,7 +38,43 @@ Run the script in your terminal:
 ruby clipboard_monitor.rb
 ```
 
-Keep this running in the background (e.g., using `tmux` or a launch agent).
+### Running in Background (macOS)
+
+The `clipboard_monitor.rb` script can be configured to run automatically in the background on macOS using `launchd` as a Launch Agent. This ensures it starts on login and keeps running.
+
+**How it works:**
+A Launch Agent definition file (`com.cgenco.clipboardsync.plist`) is placed in `~/Library/LaunchAgents/`. This file instructs `launchd` to execute the Ruby script. The script's standard output and errors are redirected to log files for debugging.
+
+**Configuration Details:**
+*   **Agent Label:** `com.cgenco.clipboardsync`
+*   **Program:** `/Users/cgenco/.rbenv/shims/ruby /Users/cgenco/projects/clipboardsync/clipboard_monitor.rb`
+*   **Working Directory:** `/Users/cgenco/projects/clipboardsync`
+*   **Logs:**
+    *   Standard Output: `/tmp/clipboard_sync.log`
+    *   Standard Error: `/tmp/clipboard_sync.err`
+
+**Management Commands:**
+
+*   **Load (Start on next login, or immediately if not running):**
+    ```bash
+    launchctl load ~/Library/LaunchAgents/com.cgenco.clipboardsync.plist
+    ```
+
+*   **Unload (Stop the service and prevent it from starting on next login):**
+    ```bash
+    launchctl unload ~/Library/LaunchAgents/com.cgenco.clipboardsync.plist
+    ```
+
+*   **Restart (Recommended way to apply changes to the .plist file or restart the script):**
+    ```bash
+    launchctl unload ~/Library/LaunchAgents/com.cgenco.clipboardsync.plist
+    launchctl load ~/Library/LaunchAgents/com.cgenco.clipboardsync.plist
+    ```
+
+*   **Check Status:**
+    ```bash
+    launchctl list | grep com.cgenco.clipboardsync
+    ```
 
 ## The "Best Fit" Strategy
 
