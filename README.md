@@ -76,6 +76,42 @@ A Launch Agent definition file (`com.cgenco.clipboardsync.plist`) is placed in `
     launchctl list | grep com.cgenco.clipboardsync
     ```
 
+### Running in Background (Linux)
+
+On Linux (specifically distributions using systemd), we use a **systemd user service** to keep the script running in the background.
+
+**Setup:**
+
+1.  Create/link the service file:
+    ```bash
+    mkdir -p ~/.config/systemd/user/
+    ln -s ~/projects/clipboardsync/clipboardsync.service ~/.config/systemd/user/
+    ```
+2.  Reload systemd and enable the service:
+    ```bash
+    systemctl --user daemon-reload
+    systemctl --user enable --now clipboardsync
+    ```
+
+**Management Commands:**
+
+*   **Status:** Check if it's running.
+    ```bash
+    systemctl --user status clipboardsync
+    ```
+*   **Logs:** Watch live output (useful for debugging).
+    ```bash
+    journalctl --user -u clipboardsync -f
+    ```
+*   **Restart:** Apply changes or restart if stuck.
+    ```bash
+    systemctl --user restart clipboardsync
+    ```
+*   **Stop:**
+    ```bash
+    systemctl --user stop clipboardsync
+    ```
+
 ## The "Best Fit" Strategy
 
 Clipboards are messy. When you copy something on MacOS, the system often creates multiple representations of that same data simultaneously (e.g., a file copy creates a File URL, a file path string, and sometimes an icon image).

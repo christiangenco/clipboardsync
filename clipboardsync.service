@@ -1,0 +1,18 @@
+[Unit]
+Description=Clipboard Sync (Linux -> MacOS)
+After=graphical-session.target network.target
+Documentation=https://github.com/christiangenco/clipboardsync
+
+[Service]
+Type=simple
+ExecStart=/home/cgenco/.local/share/mise/shims/ruby /home/cgenco/projects/clipboardsync/linux_clipboard_monitor.rb
+WorkingDirectory=/home/cgenco/projects/clipboardsync
+Restart=always
+RestartSec=5
+
+# Output logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
