@@ -132,26 +132,39 @@ class ClipboardSync
 
   def handle_rich_text_sync
     # Try HTML first
-    content = `pbpaste -Prefer public.html`.strip
+    html_content = `pbpaste -Prefer public.html`.strip
     type = "html"
 
-    if content.empty?
+    if html_content.empty?
       # Try RTF
       # Getting RTF as a string is tricky because it's binary-ish.
       # We'll try to get it as hex or rely on pbpaste's auto-conversion if possible,
       # but pbpaste usually outputs plain text unless we specify.
-      content = `pbpaste -Prefer public.rtf`.strip
+      html_content = `pbpaste -Prefer public.rtf`.strip
       type = "rtf"
     end
 
-    if !content.empty?
+    if !html_content.empty?
       puts "🌈 RICH TEXT (#{type.upcase}) DETECTED"
-      if type == "html"
-        cmd = "echo #{content.shellescape} | ssh #{REMOTE_HOST} '#{WAYLAND_ENV_SETUP} wl-copy --type text/html'"
+      
+      # Check if this looks like unwanted HTML markup (common issue)
+      # If it's just simple text wrapped in HTML, extract the plain text instead
+      plain_text = `pbpaste`.strip
+      
+      if type == "html" && html_content.include?('<meta charset') && 
+         html_content.include?('<span style=') && 
+         plain_text.length < 50 && !plain_text.include?('<')
+        puts "   ⚠️  Detected rich text wrapper around simple text: \"#{plain_text}\""
+        puts "   📝 Syncing as plain text instead to avoid HTML garbage"
+        cmd = "echo #{plain_text.shellescape} | ssh #{REMOTE_HOST} '#{WAYLAND_ENV_SETUP} wl-copy'"
+        puts "   [Syncing]: #{cmd}"
+        Thread.new { system(cmd) }
+      elsif type == "html"
+        cmd = "echo #{html_content.shellescape} | ssh #{REMOTE_HOST} '#{WAYLAND_ENV_SETUP} wl-copy --type text/html'"
         puts "   [Syncing]: #{cmd}"
         Thread.new { system(cmd) }
       else
-        cmd = "echo #{content.shellescape} | ssh #{REMOTE_HOST} '#{WAYLAND_ENV_SETUP} wl-copy --type text/rtf'"
+        cmd = "echo #{html_content.shellescape} | ssh #{REMOTE_HOST} '#{WAYLAND_ENV_SETUP} wl-copy --type text/rtf'"
         puts "   [Syncing]: (RTF Sync) #{cmd}"
         Thread.new { system(cmd) }
       end
