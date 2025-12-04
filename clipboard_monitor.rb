@@ -53,21 +53,13 @@ class ClipboardSync
       puts "⚠️  File detection failed, falling back to content check..."
     end
 
-    # 2. Check for Rich Text (RTF/HTML)
-    # Check for RTF, RTFd, or HTML class types
-    if info_str.match?(/class RTF|class HTML|public.html|public.rtf/i)
-      if handle_rich_text_sync
-        return
-      end
-    end
-
-    # 3. Check for Images
+    # 2. Check for Images
     if info_str.match?(/PNGf|JPEG|TIFF|8bps/i)
       handle_image_sync
       return
     end
 
-    # 4. Fallback to Plain Text
+    # 3. Fallback to Plain Text (includes any rich text)
     handle_text_sync
   end
 
@@ -123,50 +115,6 @@ class ClipboardSync
       Thread.new do
         system(scp_cmd)
         system(register_cmd)
-      end
-      return true
-    else
-      return false
-    end
-  end
-
-  def handle_rich_text_sync
-    # Try HTML first
-    html_content = `pbpaste -Prefer public.html`.strip
-    type = "html"
-
-    if html_content.empty?
-      # Try RTF
-      # Getting RTF as a string is tricky because it's binary-ish.
-      # We'll try to get it as hex or rely on pbpaste's auto-conversion if possible,
-      # but pbpaste usually outputs plain text unless we specify.
-      html_content = `pbpaste -Prefer public.rtf`.strip
-      type = "rtf"
-    end
-
-    if !html_content.empty?
-      puts "🌈 RICH TEXT (#{type.upcase}) DETECTED"
-      
-      # Check if this looks like unwanted HTML markup (common issue)
-      # If it's just simple text wrapped in HTML, extract the plain text instead
-      plain_text = `pbpaste`.strip
-      
-      if type == "html" && html_content.include?('<meta charset') && 
-         html_content.include?('<span style=') && 
-         plain_text.length < 50 && !plain_text.include?('<')
-        puts "   ⚠️  Detected rich text wrapper around simple text: \"#{plain_text}\""
-        puts "   📝 Syncing as plain text instead to avoid HTML garbage"
-        cmd = "echo #{plain_text.shellescape} | ssh #{REMOTE_HOST} '#{WAYLAND_ENV_SETUP} wl-copy'"
-        puts "   [Syncing]: #{cmd}"
-        Thread.new { system(cmd) }
-      elsif type == "html"
-        cmd = "echo #{html_content.shellescape} | ssh #{REMOTE_HOST} '#{WAYLAND_ENV_SETUP} wl-copy --type text/html'"
-        puts "   [Syncing]: #{cmd}"
-        Thread.new { system(cmd) }
-      else
-        cmd = "echo #{html_content.shellescape} | ssh #{REMOTE_HOST} '#{WAYLAND_ENV_SETUP} wl-copy --type text/rtf'"
-        puts "   [Syncing]: (RTF Sync) #{cmd}"
-        Thread.new { system(cmd) }
       end
       return true
     else

@@ -46,8 +46,6 @@ class LinuxClipboardMonitor
     when :image
       # Get binary image data
       current_content, _ = Open3.capture2('wl-paste --type image/png')
-    when :html
-      current_content, _ = Open3.capture2('wl-paste --type text/html --no-newline')
     when :text
       # We use --no-newline to get raw content, but we'll also strip trailing whitespace
       # to avoid infinite loops with the MacOS monitor which usually adds a newline via `echo`.
@@ -72,9 +70,8 @@ class LinuxClipboardMonitor
   def determine_type(mime_list)
     return :files if mime_list.include?('text/uri-list')
     return :image if mime_list.any? { |m| m.start_with?('image/') }
-    return :html if mime_list.include?('text/html')
     
-    # Default to text
+    # Default to text (includes HTML which gets converted to plain text)
     :text
   end
 
@@ -84,22 +81,9 @@ class LinuxClipboardMonitor
       handle_file_sync(content)
     when :image
       handle_image_sync(content)
-    when :html
-      handle_html_sync(content)
     when :text
       handle_text_sync(content)
     end
-  end
-
-  def handle_html_sync(content)
-    preview = content.length > 60 ? content[0..60].gsub(/\n/, ' ') + "..." : content.gsub(/\n/, ' ')
-    puts "🌈 HTML: \"#{preview}\""
-    
-    # Sync HTML content to Mac as HTML, not plain text
-    cmd = "printf %s #{content.shellescape} | ssh #{REMOTE_HOST} 'pbcopy -Prefer public.html'"
-    puts "   [Syncing HTML] -> #{REMOTE_HOST}..."
-    
-    Thread.new { system(cmd) }
   end
 
   def handle_text_sync(content)
